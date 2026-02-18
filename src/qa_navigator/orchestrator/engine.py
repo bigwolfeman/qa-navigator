@@ -79,6 +79,10 @@ class TestOrchestrator:
         has been addressed (passed, failed, errored, or skipped with reason).
         """
         self.checklist = checklist
+
+        # Initialize the computer if it hasn't been already
+        await self.computer.initialize()
+
         self.state = OrchestratorState.READY
         self.progress.initialize(checklist)
 

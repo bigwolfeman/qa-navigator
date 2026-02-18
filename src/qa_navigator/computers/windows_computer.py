@@ -103,7 +103,9 @@ class WindowsComputer(BaseComputer):
         self._last_screenshot: Optional[bytes] = None
 
     async def initialize(self) -> None:
-        """Initialize all host_core controllers."""
+        """Initialize all host_core controllers. Safe to call multiple times."""
+        if self._capture is not None:
+            return
         console.print("[bold yellow]Initializing Windows desktop automation...[/]")
 
         self._capture = ScreenCapture()

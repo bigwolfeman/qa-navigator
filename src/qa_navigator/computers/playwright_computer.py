@@ -82,7 +82,9 @@ class QAPlaywrightComputer(BaseComputer):
         self._last_screenshot: Optional[bytes] = None
 
     async def initialize(self) -> None:
-        """Start Playwright and launch browser."""
+        """Start Playwright and launch browser. Safe to call multiple times."""
+        if self._page is not None:
+            return
         console.print("[bold yellow]Starting Playwright browser...[/]")
         self._playwright = await async_playwright().start()
 

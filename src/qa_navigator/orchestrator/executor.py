@@ -60,7 +60,7 @@ class TestExecutor:
         agent = create_test_agent(
             computer=self.computer,
             item_instruction=instruction,
-            agent_name=f"qa_executor_{item.id}",
+            agent_name=f"qa_executor_{item.id.replace('-', '_')}",
         )
 
         runner = InMemoryRunner(agent=agent, app_name="qa_navigator")
@@ -83,6 +83,13 @@ class TestExecutor:
                     for part in event.content.parts:
                         if hasattr(part, "text") and part.text:
                             result_text += part.text
+                        elif hasattr(part, "function_call"):
+                            console.print(f"  [dim]Tool: {part.function_call.name}[/]")
+                elif event.content:
+                    console.print(f"  [dim]Event (no parts): {type(event).__name__}[/]")
+
+            if not result_text:
+                console.print(f"  [yellow]Agent returned no text. Events completed normally.[/]")
 
         except asyncio.TimeoutError:
             return ExecutionResult(
@@ -94,6 +101,7 @@ class TestExecutor:
                 duration_ms=(time.monotonic() - start_time) * 1000,
             )
         except Exception as e:
+            console.print(f"  [red]Agent exception: {type(e).__name__}: {e}[/]")
             return ExecutionResult(
                 success=False,
                 status=ItemStatus.ERROR,
