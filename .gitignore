@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Test
+.pytest_cache/
+htmlcov/
+
+# Env
+.env
+
+# Playwright
+.playwright-mcp/
+
+# Checkpoints
+checkpoints/
+
+# OS
+.DS_Store

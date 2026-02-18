@@ -1,0 +1,1 @@
+"""Adapter framework and registry."""
