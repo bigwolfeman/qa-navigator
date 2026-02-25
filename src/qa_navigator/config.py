@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     model_config = {"env_prefix": "QA_NAV_"}
 
     # Gemini models
-    computer_use_model: str = "gemini-3-pro-preview"
+    computer_use_model: str = "gemini-3-flash-preview"
     analysis_model: str = "gemini-3-flash-preview"
 
     # Browser config

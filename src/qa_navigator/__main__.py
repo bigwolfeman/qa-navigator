@@ -21,6 +21,7 @@ async def run_test(
     instructions: str,
     headless: bool = False,
     checkpoint_dir: Optional[Path] = None,
+    recording_dir: Optional[str] = None,
 ) -> int:
     """Run a full QA test session.
 
@@ -43,6 +44,7 @@ async def run_test(
         screen_size=settings.screen_size,
         initial_url=target_url,
         headless=headless,
+        recording_dir=recording_dir,
     )
 
     # Step 3: Run orchestrator
@@ -55,6 +57,10 @@ async def run_test(
         result = await orchestrator.run(checklist)
     finally:
         await computer.close()
+
+    # Log recording location if active
+    if hasattr(computer, "video_path") and computer.video_path:
+        console.print(f"[bold cyan]Screen recording: {computer.video_path}[/]")
 
     # Step 4: Determine exit code
     if result.failed > 0:
@@ -77,6 +83,7 @@ def main():
     )
     parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
     parser.add_argument("--checkpoint-dir", type=Path, help="Directory for checkpointing")
+    parser.add_argument("--recording-dir", default="recordings", help="Directory for screen recording (default: recordings/)")
 
     args = parser.parse_args()
 
@@ -85,6 +92,7 @@ def main():
         instructions=args.instructions,
         headless=args.headless,
         checkpoint_dir=args.checkpoint_dir,
+        recording_dir=args.recording_dir,
     ))
     sys.exit(exit_code)
 

@@ -14,6 +14,7 @@ import asyncio
 import subprocess
 import time
 from io import BytesIO
+from pathlib import Path
 from typing import Literal, Optional
 
 from google.adk.tools.computer_use.base_computer import (
@@ -80,6 +81,7 @@ class WindowsComputer(BaseComputer):
         target_window_title: Optional[str] = None,
         settle_time: float = 0.5,
         search_engine_url: str = "https://www.google.com",
+        recording_dir: Optional[str] = None,
     ):
         """
         Args:
@@ -88,11 +90,14 @@ class WindowsComputer(BaseComputer):
                 If None, captures the full desktop.
             settle_time: Seconds to wait after actions before screenshot.
             search_engine_url: URL for the search() method.
+            recording_dir: Directory to save screen recording (MP4 via ffmpeg).
+                ffmpeg must be on PATH. If None, no recording is made.
         """
         self._screen_size = screen_size
         self._target_window_title = target_window_title
         self._settle_time = settle_time
         self._search_engine_url = search_engine_url
+        self._recording_dir = recording_dir
 
         self._capture: Optional[ScreenCapture] = None
         self._mouse: Optional[MouseController] = None
@@ -101,6 +106,8 @@ class WindowsComputer(BaseComputer):
         self._focus: Optional[FocusController] = None
         self._target_hwnd: Optional[int] = None
         self._last_screenshot: Optional[bytes] = None
+        self._ffmpeg_proc: Optional[subprocess.Popen] = None
+        self._video_path: Optional[Path] = None
 
     async def initialize(self) -> None:
         """Initialize all host_core controllers. Safe to call multiple times."""
@@ -124,10 +131,44 @@ class WindowsComputer(BaseComputer):
             else:
                 console.print(f"[yellow]Window '{self._target_window_title}' not found, using full desktop[/]")
 
+        # Start screen recording via ffmpeg if requested
+        if self._recording_dir:
+            Path(self._recording_dir).mkdir(parents=True, exist_ok=True)
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            self._video_path = Path(self._recording_dir) / f"qa_run_{timestamp}.mp4"
+            w, h = self._screen_size
+            self._ffmpeg_proc = subprocess.Popen(
+                [
+                    "ffmpeg", "-y",
+                    "-f", "gdigrab",
+                    "-framerate", "10",
+                    "-video_size", f"{w}x{h}",
+                    "-i", "desktop",
+                    "-vcodec", "libx264",
+                    "-pix_fmt", "yuv420p",
+                    "-preset", "ultrafast",
+                    str(self._video_path),
+                ],
+                stdin=subprocess.PIPE,   # so we can send 'q' to stop gracefully
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            console.print(f"[bold cyan]Recording to: {self._video_path}[/]")
+
         console.print("[bold green]Windows desktop automation ready.[/]")
 
     async def close(self) -> None:
-        """Cleanup controllers."""
+        """Cleanup controllers and finalize screen recording."""
+        # Stop ffmpeg gracefully (send 'q' to stdin, wait for file to finalize)
+        if self._ffmpeg_proc and self._ffmpeg_proc.poll() is None:
+            try:
+                self._ffmpeg_proc.stdin.write(b"q")
+                self._ffmpeg_proc.stdin.flush()
+                self._ffmpeg_proc.wait(timeout=15)
+            except Exception:
+                self._ffmpeg_proc.kill()
+            console.print(f"[bold green]Recording saved: {self._video_path}[/]")
+
         if self._mouse:
             self._mouse.cleanup()
         if self._keyboard:
@@ -299,6 +340,11 @@ class WindowsComputer(BaseComputer):
         return await self.current_state()
 
     # --- Windows-specific extensions ---
+
+    @property
+    def video_path(self) -> Optional[Path]:
+        """Path to the screen recording MP4, available after close()."""
+        return self._video_path
 
     def get_last_screenshot(self) -> Optional[bytes]:
         """Return the last captured screenshot without triggering a new capture."""

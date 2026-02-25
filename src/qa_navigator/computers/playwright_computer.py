@@ -10,6 +10,7 @@ Enhanced with:
 
 import asyncio
 import time
+from pathlib import Path
 from typing import Literal, Optional
 
 from google.adk.tools.computer_use.base_computer import (
@@ -66,6 +67,7 @@ class QAPlaywrightComputer(BaseComputer):
         headless: bool = False,
         settle_time: float = 0.5,
         user_data_dir: Optional[str] = None,
+        recording_dir: Optional[str] = None,
     ):
         self._screen_size = screen_size
         self._initial_url = initial_url
@@ -73,6 +75,7 @@ class QAPlaywrightComputer(BaseComputer):
         self._headless = headless
         self._settle_time = settle_time
         self._user_data_dir = user_data_dir
+        self._recording_dir = recording_dir
 
         # Initialized in initialize()
         self._playwright = None
@@ -80,6 +83,7 @@ class QAPlaywrightComputer(BaseComputer):
         self._context: Optional[BrowserContext] = None
         self._page: Optional[Page] = None
         self._last_screenshot: Optional[bytes] = None
+        self._video_path: Optional[Path] = None
 
     async def initialize(self) -> None:
         """Start Playwright and launch browser. Safe to call multiple times."""
@@ -93,11 +97,23 @@ class QAPlaywrightComputer(BaseComputer):
             "--disable-gpu",
         ]
 
+        # Build context options (video recording if requested)
+        context_kwargs = {}
+        if self._recording_dir:
+            Path(self._recording_dir).mkdir(parents=True, exist_ok=True)
+            context_kwargs["record_video_dir"] = self._recording_dir
+            context_kwargs["record_video_size"] = {
+                "width": self._screen_size[0],
+                "height": self._screen_size[1],
+            }
+            console.print(f"[bold cyan]Recording to: {self._recording_dir}[/]")
+
         if self._user_data_dir:
             self._context = await self._playwright.chromium.launch_persistent_context(
                 self._user_data_dir,
                 headless=self._headless,
                 args=browser_args,
+                **context_kwargs,
             )
             self._browser = self._context.browser
         else:
@@ -105,7 +121,7 @@ class QAPlaywrightComputer(BaseComputer):
                 args=browser_args,
                 headless=self._headless,
             )
-            self._context = await self._browser.new_context()
+            self._context = await self._browser.new_context(**context_kwargs)
 
         if not self._context.pages:
             self._page = await self._context.new_page()
@@ -120,8 +136,14 @@ class QAPlaywrightComputer(BaseComputer):
         console.print("[bold green]Playwright browser ready.[/]")
 
     async def close(self) -> None:
-        """Cleanup browser resources."""
+        """Cleanup browser resources. Finalizes video recording if active."""
         if self._context:
+            # Capture video path before closing (close() writes the file)
+            if self._recording_dir and self._page and self._page.video:
+                try:
+                    self._video_path = Path(await self._page.video.path())
+                except Exception:
+                    pass
             await self._context.close()
         try:
             if self._browser:
@@ -130,6 +152,8 @@ class QAPlaywrightComputer(BaseComputer):
             pass  # Browser may already be closed
         if self._playwright:
             await self._playwright.stop()
+        if self._video_path:
+            console.print(f"[bold green]Recording saved: {self._video_path}[/]")
 
     # --- BaseComputer required methods ---
 
@@ -282,6 +306,11 @@ class QAPlaywrightComputer(BaseComputer):
     async def get_accessibility_tree(self) -> dict:
         """Return Playwright accessibility snapshot for element discovery."""
         return await self._page.accessibility.snapshot()
+
+    @property
+    def video_path(self) -> Optional[Path]:
+        """Path to the screen recording, available after close()."""
+        return self._video_path
 
     @property
     def page(self) -> Page:
