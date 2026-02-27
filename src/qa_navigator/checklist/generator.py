@@ -5,6 +5,7 @@ and generates a massive, itemized checklist of every testable UI element.
 The key is EXHAUSTIVENESS - every button, input, link, hover state, error case.
 """
 
+import asyncio
 import json
 import uuid
 from typing import Optional
@@ -125,15 +126,28 @@ INSTRUCTIONS: {instructions}
 
         prompt += "\nGenerate the checklist now. Be EXHAUSTIVE. Every element. Every interaction. Every edge case."
 
-        response = await self.client.aio.models.generate_content(
-            model=settings.analysis_model,
-            contents=prompt,
-            config=genai.types.GenerateContentConfig(
-                system_instruction=CHECKLIST_SYSTEM_PROMPT,
-                response_mime_type="application/json",
-                temperature=0.2,
-            ),
-        )
+        _gen_retry_delays = [30, 60, 120]
+        response = None
+        for _attempt in range(len(_gen_retry_delays) + 1):
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=settings.analysis_model,
+                    contents=prompt,
+                    config=genai.types.GenerateContentConfig(
+                        system_instruction=CHECKLIST_SYSTEM_PROMPT,
+                        response_mime_type="application/json",
+                        temperature=0.2,
+                    ),
+                )
+                break
+            except Exception as e:
+                err = str(e)
+                if ("503" in err or "UNAVAILABLE" in err) and _attempt < len(_gen_retry_delays):
+                    wait = _gen_retry_delays[_attempt]
+                    console.print(f"  [yellow]503 server overload (attempt {_attempt + 1}) — waiting {wait}s before retry...[/]")
+                    await asyncio.sleep(wait)
+                else:
+                    raise
 
         # Parse the response
         checklist = self._parse_response(response.text, instructions, target_url, target_app)
