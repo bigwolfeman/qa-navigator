@@ -49,10 +49,11 @@ async def run_test(
         recording_dir=recording_dir,
     )
 
-    # Step 3: Run orchestrator
+    # Step 3: Run orchestrator (reset_url ensures clean browser state per item)
     orchestrator = TestOrchestrator(
         computer=computer,
         checkpoint_dir=checkpoint_dir,
+        reset_url=target_url,
     )
 
     try:
