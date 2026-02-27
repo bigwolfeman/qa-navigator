@@ -53,6 +53,14 @@ class TestExecutor:
         """
         start_time = time.monotonic()
 
+        # Capture state before agent runs — used for before/after comparison in Flash eval
+        before_screenshot: Optional[bytes] = None
+        try:
+            before_state = await self.computer.current_state()
+            before_screenshot = before_state.screenshot
+        except Exception:
+            pass
+
         instruction = build_item_instruction(
             item_id=item.id,
             category=item.category.value,
@@ -180,6 +188,7 @@ class TestExecutor:
                 screenshot=final_state.screenshot,
                 action=item.action,
                 expected_outcome=item.expected_outcome,
+                before_screenshot=before_screenshot,
             )
 
         return ExecutionResult(
@@ -196,17 +205,25 @@ class TestExecutor:
         screenshot: bytes,
         action: str,
         expected_outcome: str,
+        before_screenshot: Optional[bytes] = None,
     ) -> tuple[ItemStatus, str]:
         """Use Flash to analyze a screenshot and determine PASS/FAIL.
 
         Called when the computer-use agent completes without producing text.
         Flash acts as the evaluator: it sees the final screen state and
         judges whether the expected outcome was achieved.
+
+        If before_screenshot is provided, Flash compares the before and after
+        states to detect changes — much more accurate than after-only analysis.
         """
         client = genai.Client()
-        img_b64 = base64.b64encode(screenshot).decode("utf-8")
+        after_b64 = base64.b64encode(screenshot).decode("utf-8")
 
-        prompt = f"""You are a QA evaluator. Look at this screenshot and determine if the test passed or failed.
+        if before_screenshot:
+            before_b64 = base64.b64encode(before_screenshot).decode("utf-8")
+            prompt = f"""You are a QA evaluator comparing the state of a web app BEFORE and AFTER an action.
+
+The FIRST image is BEFORE the action. The SECOND image is AFTER the action.
 
 ACTION THAT WAS PERFORMED:
 {action}
@@ -214,7 +231,50 @@ ACTION THAT WAS PERFORMED:
 EXPECTED OUTCOME:
 {expected_outcome}
 
-Look at the screenshot carefully. Did the action succeed and produce the expected outcome?
+EVALUATION GUIDELINES:
+- Focus on FUNCTIONAL changes: did new content appear? Did state change correctly?
+- IGNORE CSS styling differences (colors, backgrounds, fonts may vary between environments)
+- IGNORE minor layout variations
+- For "add a todo" tests: PASS if any new list item appeared after the action
+- For "empty/whitespace input" tests: PASS if no new item appeared (correct rejection)
+- For "page load" tests: PASS if the page content is visible and not blank/error
+- For "input field" tests: PASS if the field exists and is interactable
+- Compare BEFORE vs AFTER — look for meaningful functional change
+
+Did the action achieve the expected functional outcome?
+
+Respond in this EXACT format:
+RESULT: PASS
+OBSERVATION: [Brief description of the functional change you observed]
+
+OR:
+
+RESULT: FAIL
+OBSERVATION: [What specifically is missing or wrong functionally]
+
+Be concise. One line for RESULT, one line for OBSERVATION."""
+
+            contents = [
+                types.Part(inline_data=types.Blob(mime_type="image/png", data=before_b64)),
+                types.Part(inline_data=types.Blob(mime_type="image/png", data=after_b64)),
+                types.Part(text=prompt),
+            ]
+        else:
+            prompt = f"""You are a QA evaluator. Look at this screenshot and determine if the test passed or failed.
+
+ACTION THAT WAS PERFORMED:
+{action}
+
+EXPECTED OUTCOME:
+{expected_outcome}
+
+EVALUATION GUIDELINES:
+- Focus on FUNCTIONAL correctness, not visual styling
+- IGNORE CSS color/background differences — they vary between environments
+- For "add a todo" tests: PASS if a todo item is visible in the list
+- For "page load" tests: PASS if the page content is visible
+
+Did the action succeed and produce the expected outcome?
 
 Respond in this EXACT format:
 RESULT: PASS
@@ -227,19 +287,16 @@ OBSERVATION: [What you see that contradicts the expected outcome, or what is mis
 
 Be concise. One line for RESULT, one line for OBSERVATION."""
 
+            contents = [
+                types.Part(inline_data=types.Blob(mime_type="image/png", data=after_b64)),
+                types.Part(text=prompt),
+            ]
+
         for attempt in range(3):
           try:
             response = await client.aio.models.generate_content(
                 model=settings.analysis_model,
-                contents=[
-                    types.Part(
-                        inline_data=types.Blob(
-                            mime_type="image/png",
-                            data=img_b64,
-                        )
-                    ),
-                    types.Part(text=prompt),
-                ],
+                contents=contents,
             )
             analysis_text = response.text or ""
             console.print(f"  [dim]Flash response: {repr(analysis_text[:120])}[/]")

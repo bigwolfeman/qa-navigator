@@ -70,13 +70,20 @@ ACTION TO PERFORM:
 EXPECTED OUTCOME:
 {expected_outcome}
 
+CRITICAL RULES FOR WEB APP INTERACTION:
+- When typing text into an input field to SUBMIT it (e.g. add a todo), you MUST press Enter afterward using key_combination("Return") or key_combination("Enter"). Typing alone does not submit.
+- Click an element before typing into it to ensure it has focus.
+- After pressing Enter to submit a form or todo, wait a moment and verify the result appeared.
+- If the action says "press Enter" or "submit", always use key_combination to press the Enter/Return key.
+
 INSTRUCTIONS:
-1. Look at the current screen state.
-2. If preconditions are not met, take steps to meet them first.
-3. Perform EXACTLY the action described above.
-4. Observe the actual result on screen.
-5. Compare what you see with the expected outcome.
-6. Report your finding in this exact format:
+1. Look at the current screen state using a screenshot tool if needed.
+2. If preconditions are not met, take steps to meet them first (e.g. navigate to URL).
+3. Perform EXACTLY the action described above, including pressing Enter when submitting.
+4. Wait briefly after interactions to let the UI update.
+5. Observe the actual result on screen.
+6. Compare what you see with the expected outcome.
+7. Report your finding in this exact format:
 
 RESULT: PASS or FAIL
 OBSERVATION: [What you actually saw on screen after the action]
