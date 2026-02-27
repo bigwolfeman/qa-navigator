@@ -323,6 +323,18 @@ class QAPlaywrightComputer(BaseComputer):
         """Return Playwright accessibility snapshot for element discovery."""
         return await self._page.accessibility.snapshot()
 
+    async def get_ui_tree(self) -> dict:
+        """Return accessibility snapshot for the current page.
+
+        Provides element names, roles, and positions so the agent can
+        discover interactive elements without relying solely on screenshots.
+        """
+        try:
+            snapshot = await self._page.accessibility.snapshot()
+            return snapshot or {}
+        except Exception as e:
+            return {"error": str(e)}
+
     @property
     def video_path(self) -> Optional[Path]:
         """Path to the screen recording, available after close()."""

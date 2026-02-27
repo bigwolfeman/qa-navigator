@@ -11,6 +11,25 @@ from google.adk.tools.computer_use.base_computer import BaseComputer
 
 from ..config import settings
 
+# ---------------------------------------------------------------------------
+# Monkey-patch: add get_ui_tree() to BaseComputer so ComputerUseToolset
+# exposes it as a tool.  ComputerUseToolset discovers tools by iterating
+# dir(BaseComputer), so the method must exist on the ABC class itself.
+# The default implementation returns an empty dict; computer subclasses
+# override with real accessibility data.
+# ---------------------------------------------------------------------------
+if not hasattr(BaseComputer, "get_ui_tree"):
+    async def _base_get_ui_tree(self) -> dict:
+        """Return the UI element tree for the current window/application.
+
+        Use this to discover interactive elements (buttons, inputs, labels)
+        with their names, types, and screen coordinates before clicking.
+        Returns a dict with an 'elements' list.
+        """
+        return {}
+
+    BaseComputer.get_ui_tree = _base_get_ui_tree  # type: ignore[attr-defined]
+
 
 def create_test_agent(
     computer: BaseComputer,

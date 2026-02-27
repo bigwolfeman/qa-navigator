@@ -2,7 +2,9 @@
 
 import argparse
 import asyncio
+import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -17,6 +19,42 @@ from .report.html import generate_html_report
 console = Console()
 
 
+def _build_computer(args):
+    """Construct the right BaseComputer from CLI args."""
+    computer_type = getattr(args, "computer", "browser")
+
+    if computer_type == "windows":
+        # Windows desktop automation — only works on Windows
+        if sys.platform != "win32":
+            console.print("[bold red]--computer windows only works on Windows.[/]")
+            sys.exit(2)
+
+        from .computers.windows_computer import WindowsComputer
+
+        app_proc = None
+        if args.app_exe:
+            console.print(f"[bold yellow]Launching app: {args.app_exe}[/]")
+            app_proc = subprocess.Popen(args.app_exe)
+            time.sleep(args.app_launch_wait)
+
+        screen_w, screen_h = settings.screen_size
+        computer = WindowsComputer(
+            screen_size=(screen_w, screen_h),
+            target_window_title=args.app_title or None,
+            recording_dir=args.recording_dir,
+        )
+        return computer, app_proc
+    else:
+        # Default: browser via Playwright
+        computer = QAPlaywrightComputer(
+            screen_size=settings.screen_size,
+            initial_url=args.url,
+            headless=args.headless,
+            recording_dir=args.recording_dir,
+        )
+        return computer, None
+
+
 async def run_test(
     target_url: str,
     instructions: str,
@@ -24,6 +62,10 @@ async def run_test(
     checkpoint_dir: Optional[Path] = None,
     recording_dir: Optional[str] = None,
     report_dir: Optional[Path] = None,
+    computer_type: str = "browser",
+    app_exe: Optional[str] = None,
+    app_title: Optional[str] = None,
+    app_launch_wait: float = 3.0,
 ) -> int:
     """Run a full QA test session.
 
@@ -42,24 +84,46 @@ async def run_test(
         return 2
 
     # Step 2: Set up computer
-    computer = QAPlaywrightComputer(
-        screen_size=settings.screen_size,
-        initial_url=target_url,
-        headless=headless,
-        recording_dir=recording_dir,
-    )
+    app_proc = None
+    if computer_type == "windows":
+        if sys.platform != "win32":
+            console.print("[bold red]--computer windows only works on Windows.[/]")
+            return 2
+        from .computers.windows_computer import WindowsComputer
+
+        if app_exe:
+            console.print(f"[bold yellow]Launching app: {app_exe}[/]")
+            app_proc = subprocess.Popen(app_exe)
+            time.sleep(app_launch_wait)
+
+        computer = WindowsComputer(
+            screen_size=settings.screen_size,
+            target_window_title=app_title or None,
+            recording_dir=recording_dir,
+        )
+        reset_url = None  # No URL reset for desktop apps
+    else:
+        computer = QAPlaywrightComputer(
+            screen_size=settings.screen_size,
+            initial_url=target_url,
+            headless=headless,
+            recording_dir=recording_dir,
+        )
+        reset_url = target_url
 
     # Step 3: Run orchestrator (reset_url ensures clean browser state per item)
     orchestrator = TestOrchestrator(
         computer=computer,
         checkpoint_dir=checkpoint_dir,
-        reset_url=target_url,
+        reset_url=reset_url,
     )
 
     try:
         result = await orchestrator.run(checklist)
     finally:
         await computer.close()
+        if app_proc and app_proc.poll() is None:
+            app_proc.terminate()
 
     # Log recording location if active
     video_path = None
@@ -109,16 +173,40 @@ def main():
         prog="qa-navigator",
         description="AI-powered exhaustive Visual QA Testing Agent",
     )
-    parser.add_argument("--url", required=True, help="Target URL to test")
+    parser.add_argument("--url", required=True, help="Target URL or app description (used for checklist generation)")
     parser.add_argument(
         "--instructions",
         default="Test this application thoroughly. Check every button, input, link, and interactive element.",
         help="Testing instructions",
     )
-    parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
+    parser.add_argument("--headless", action="store_true", help="Run browser in headless mode (browser only)")
     parser.add_argument("--checkpoint-dir", type=Path, help="Directory for checkpointing")
     parser.add_argument("--recording-dir", default="recordings", help="Directory for screen recording (default: recordings/)")
     parser.add_argument("--report-dir", type=Path, default=None, help="Directory to write HTML report (optional)")
+
+    # Computer selection
+    parser.add_argument(
+        "--computer",
+        choices=["browser", "windows"],
+        default="browser",
+        help="Computer backend: 'browser' (Playwright, default) or 'windows' (Win32 desktop)",
+    )
+    parser.add_argument(
+        "--app-exe",
+        default=None,
+        help="Windows only: path to executable to launch before testing (e.g. C:\\Windows\\System32\\calc.exe)",
+    )
+    parser.add_argument(
+        "--app-title",
+        default=None,
+        help="Windows only: window title substring to target (e.g. 'Calculator')",
+    )
+    parser.add_argument(
+        "--app-launch-wait",
+        type=float,
+        default=3.0,
+        help="Windows only: seconds to wait after launching --app-exe (default: 3)",
+    )
 
     args = parser.parse_args()
 
@@ -129,6 +217,10 @@ def main():
         checkpoint_dir=args.checkpoint_dir,
         recording_dir=args.recording_dir,
         report_dir=args.report_dir,
+        computer_type=args.computer,
+        app_exe=args.app_exe,
+        app_title=args.app_title,
+        app_launch_wait=args.app_launch_wait,
     ))
     sys.exit(exit_code)
 

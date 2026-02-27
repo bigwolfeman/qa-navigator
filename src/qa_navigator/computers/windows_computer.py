@@ -378,3 +378,69 @@ class WindowsComputer(BaseComputer):
             self._focus.activate_window(self._target_hwnd)
             return True
         return False
+
+    async def get_ui_tree(self) -> dict:
+        """Return UIA element tree for the target window (or full desktop).
+
+        Provides element names, control types, automation IDs, and screen
+        coordinates so the agent can find interactive elements precisely.
+        Depth limited to 5 levels to keep response concise.
+        """
+        try:
+            import uiautomation as uia  # type: ignore[import]
+        except ImportError:
+            return {"error": "uiautomation package not installed", "elements": []}
+
+        def _dump(control, depth: int, max_depth: int) -> list:
+            if depth > max_depth:
+                return []
+            try:
+                bounds = None
+                try:
+                    rect = control.BoundingRectangle
+                    if rect:
+                        bounds = {
+                            "x": rect.left,
+                            "y": rect.top,
+                            "w": rect.width(),
+                            "h": rect.height(),
+                            "cx": rect.left + rect.width() // 2,
+                            "cy": rect.top + rect.height() // 2,
+                        }
+                except Exception:
+                    pass
+
+                node: dict = {
+                    "name": control.Name or "",
+                    "type": control.ControlTypeName,
+                    "id": control.AutomationId or "",
+                    "enabled": control.IsEnabled,
+                }
+                if bounds:
+                    node["bounds"] = bounds
+
+                children: list = []
+                try:
+                    for child in control.GetChildren():
+                        children.extend(_dump(child, depth + 1, max_depth))
+                except Exception:
+                    pass
+                if children:
+                    node["children"] = children
+
+                return [node]
+            except Exception:
+                return []
+
+        try:
+            if self._target_hwnd:
+                root = uia.ControlFromHandle(self._target_hwnd)
+                max_depth = 5
+            else:
+                root = uia.GetRootControl()
+                max_depth = 3  # Shallower for full desktop to limit size
+
+            elements = _dump(root, depth=0, max_depth=max_depth)
+            return {"elements": elements}
+        except Exception as e:
+            return {"error": str(e), "elements": []}
