@@ -19,8 +19,8 @@ class Settings(BaseSettings):
         object.__setattr__(self, "analysis_model", self.analysis_model.strip())
 
     # Browser config
-    screen_width: int = 1280
-    screen_height: int = 936
+    screen_width: int = 800
+    screen_height: int = 600
     headless: bool = False
     browser_timeout_ms: int = 30000
 

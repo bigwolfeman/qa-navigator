@@ -166,7 +166,9 @@ class QAPlaywrightComputer(BaseComputer):
     async def current_state(self) -> ComputerState:
         await self._page.wait_for_load_state()
         await asyncio.sleep(self._settle_time)
-        screenshot_bytes = await self._page.screenshot(type="png", full_page=False)
+        # JPEG quality=50 at 800x600 is ~10x smaller than PNG at 1280x936,
+        # dramatically reducing token cost per screenshot.
+        screenshot_bytes = await self._page.screenshot(type="jpeg", quality=50, full_page=False)
         self._last_screenshot = screenshot_bytes
         return ComputerState(screenshot=screenshot_bytes, url=self._page.url)
 
