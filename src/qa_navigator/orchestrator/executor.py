@@ -12,6 +12,7 @@ import time
 from typing import Optional
 
 _RETRY_DELAYS = [300, 600, 900, 1800]  # seconds to wait on 429 before each retry attempt (5m/10m/15m/30m)
+_503_RETRY_DELAYS = [30, 60, 120]      # seconds to wait on 503 server overload before each retry attempt
 
 from google import genai
 from google.adk.runners import InMemoryRunner
@@ -122,6 +123,19 @@ class TestExecutor:
                     console.print(f"  [yellow]429 quota hit (attempt {attempt+1}/{len(_RETRY_DELAYS)+1}) — waiting {wait_secs:.0f}s then retrying {item.id}...[/]")
                     await asyncio.sleep(wait_secs)
                     # Re-create session for the retry
+                    session = await runner.session_service.create_session(
+                        app_name="qa_navigator",
+                        user_id="orchestrator",
+                    )
+                    result_text = ""
+                    continue
+
+                # 503 Server Overload — retry with short backoff
+                is_503 = "503" in err_str or "UNAVAILABLE" in err_str
+                if is_503 and attempt < len(_503_RETRY_DELAYS):
+                    wait_secs = _503_RETRY_DELAYS[attempt]
+                    console.print(f"  [yellow]503 server overload (attempt {attempt+1}/{len(_503_RETRY_DELAYS)+1}) — waiting {wait_secs}s then retrying {item.id}...[/]")
+                    await asyncio.sleep(wait_secs)
                     session = await runner.session_service.create_session(
                         app_name="qa_navigator",
                         user_id="orchestrator",
