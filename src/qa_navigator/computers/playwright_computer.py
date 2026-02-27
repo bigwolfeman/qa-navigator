@@ -193,8 +193,11 @@ class QAPlaywrightComputer(BaseComputer):
         press_enter: bool = True,
         clear_before_typing: bool = True,
     ) -> ComputerState:
+        active_before = await self._page.evaluate("document.activeElement?.tagName + ':' + (document.activeElement?.className || '')")
         await self._page.mouse.click(x, y)
         await self._page.wait_for_load_state()
+        active_after = await self._page.evaluate("document.activeElement?.tagName + ':' + (document.activeElement?.className || '')")
+        console.print(f"  [dim]type_text_at({x},{y},'{text[:30]}') active={active_before!r} -> {active_after!r}[/]")
 
         if clear_before_typing:
             await self.key_combination(["Control", "A"])
@@ -206,6 +209,8 @@ class QAPlaywrightComputer(BaseComputer):
         if press_enter:
             await self.key_combination(["Enter"])
         await self._page.wait_for_load_state()
+        active_final = await self._page.evaluate("document.activeElement?.tagName + ':' + (document.activeElement?.className || '')")
+        console.print(f"  [dim]  -> after enter active={active_final!r} url={self._page.url[:60]!r}[/]")
         return await self.current_state()
 
     async def scroll_document(

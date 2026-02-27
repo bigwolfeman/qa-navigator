@@ -18,9 +18,11 @@ class Settings(BaseSettings):
         object.__setattr__(self, "computer_use_model", self.computer_use_model.strip())
         object.__setattr__(self, "analysis_model", self.analysis_model.strip())
 
-    # Browser config
-    screen_width: int = 800
-    screen_height: int = 600
+    # Browser config — 1280x900 matches Gemini computer-use model coordinate priors.
+    # TodoMVC input is at absolute y=175px; on 800x600 the model's virtual_y≈200 maps to
+    # actual y=120 (misses). On 1280x900, virtual_y≈200 maps to actual y=180 (hits).
+    screen_width: int = 1280
+    screen_height: int = 900
     headless: bool = False
     browser_timeout_ms: int = 30000
 
