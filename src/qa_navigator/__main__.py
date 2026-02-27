@@ -88,6 +88,22 @@ async def run_test(
 
 
 def main():
+    # Detect serve mode: first arg is "serve"
+    if len(sys.argv) > 1 and sys.argv[1] == "serve":
+        parser = argparse.ArgumentParser(prog="qa-navigator serve")
+        parser.add_argument("--host", default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
+        parser.add_argument("--port", type=int, default=8080, help="Port to listen on (default: 8080)")
+        args = parser.parse_args(sys.argv[2:])
+        try:
+            import uvicorn
+            from .server.app import app
+            uvicorn.run(app, host=args.host, port=args.port)
+        except ImportError:
+            console.print("[red]uvicorn not installed. Run: pip install uvicorn[/]")
+            sys.exit(1)
+        return
+
+    # Default: run mode (backwards-compatible with existing bat files)
     parser = argparse.ArgumentParser(
         prog="qa-navigator",
         description="AI-powered exhaustive Visual QA Testing Agent",
