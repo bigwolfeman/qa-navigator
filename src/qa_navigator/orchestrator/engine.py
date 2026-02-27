@@ -8,6 +8,7 @@ Every result is validated with evidence (before/after screenshots).
 This is NOT an LLM. It is deterministic Python code that uses LLMs as tools.
 """
 
+import asyncio
 import base64
 import time
 from enum import Enum
@@ -137,6 +138,11 @@ class TestOrchestrator:
 
             self.state = OrchestratorState.ADVANCING
             self.progress.log_item_result(item)
+
+            # Rate-limit: pause between items to stay under Gemini quota (2M token/min)
+            if checklist.get_next_pending() is not None and settings.inter_item_delay_seconds > 0:
+                console.print(f"[dim]  Pausing {settings.inter_item_delay_seconds:.0f}s before next item (quota guard)...[/]")
+                await asyncio.sleep(settings.inter_item_delay_seconds)
 
             # Periodic progress update every 5 items
             if items_executed % 5 == 0:

@@ -251,21 +251,30 @@ class QAPlaywrightComputer(BaseComputer):
         return await self.current_state()
 
     async def go_back(self) -> ComputerState:
-        await self._page.go_back()
-        await self._page.wait_for_load_state()
+        try:
+            await self._page.go_back()
+            await self._page.wait_for_load_state()
+        except Exception:
+            pass
         return await self.current_state()
 
     async def go_forward(self) -> ComputerState:
-        await self._page.go_forward()
-        await self._page.wait_for_load_state()
+        try:
+            await self._page.go_forward()
+            await self._page.wait_for_load_state()
+        except Exception:
+            pass
         return await self.current_state()
 
     async def search(self) -> ComputerState:
         return await self.navigate(self._search_engine_url)
 
     async def navigate(self, url: str) -> ComputerState:
-        await self._page.goto(url)
-        await self._page.wait_for_load_state()
+        try:
+            await self._page.goto(url)
+            await self._page.wait_for_load_state()
+        except Exception:
+            pass  # Invalid URL or navigation error — return current state
         return await self.current_state()
 
     async def key_combination(self, keys: list[str]) -> ComputerState:

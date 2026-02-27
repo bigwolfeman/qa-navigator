@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     computer_use_model: str = "gemini-3-flash-preview"
     analysis_model: str = "gemini-3-flash-preview"
 
+    def model_post_init(self, __context) -> None:
+        # Strip trailing whitespace from model names (Windows bat files sometimes add spaces)
+        object.__setattr__(self, "computer_use_model", self.computer_use_model.strip())
+        object.__setattr__(self, "analysis_model", self.analysis_model.strip())
+
     # Browser config
     screen_width: int = 1280
     screen_height: int = 936
@@ -23,6 +28,7 @@ class Settings(BaseSettings):
     max_retries_per_item: int = 2
     item_timeout_seconds: int = 120
     settle_time_seconds: float = 0.5
+    inter_item_delay_seconds: float = 30.0  # Delay between items to stay under 2M token/min quota
 
     # Checklist config
     max_checklist_items: int = 200
