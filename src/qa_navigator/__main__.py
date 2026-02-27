@@ -51,6 +51,7 @@ async def run_test(
     orchestrator = TestOrchestrator(
         computer=computer,
         checkpoint_dir=checkpoint_dir,
+        reset_url=target_url,
     )
 
     try:

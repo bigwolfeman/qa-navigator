@@ -66,12 +66,14 @@ class TestOrchestrator:
         self,
         computer: BaseComputer,
         checkpoint_dir: Optional[Path] = None,
+        reset_url: Optional[str] = None,
     ):
         self.computer = computer
         self.executor = TestExecutor(computer)
         self.progress = ProgressTracker(checkpoint_dir=checkpoint_dir)
         self.state = OrchestratorState.INITIALIZING
         self.checklist: Optional[Checklist] = None
+        self.reset_url = reset_url
 
     async def run(self, checklist: Checklist) -> Checklist:
         """Execute all items in the checklist. Returns the completed checklist.
@@ -99,6 +101,10 @@ class TestOrchestrator:
             self.state = OrchestratorState.EXECUTING_ITEM
 
             self.progress.log_item_start(item)
+
+            # Reset page to known URL before each item so agents start from clean state
+            if self.reset_url:
+                await self.computer.navigate(self.reset_url)
 
             # Capture before state
             before_state = await self.computer.current_state()
