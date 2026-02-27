@@ -12,6 +12,7 @@ from .checklist.generator import ChecklistGenerator
 from .computers.playwright_computer import QAPlaywrightComputer
 from .config import settings
 from .orchestrator.engine import TestOrchestrator
+from .report.html import generate_html_report
 
 console = Console()
 
@@ -22,6 +23,7 @@ async def run_test(
     headless: bool = False,
     checkpoint_dir: Optional[Path] = None,
     recording_dir: Optional[str] = None,
+    report_dir: Optional[Path] = None,
 ) -> int:
     """Run a full QA test session.
 
@@ -51,7 +53,6 @@ async def run_test(
     orchestrator = TestOrchestrator(
         computer=computer,
         checkpoint_dir=checkpoint_dir,
-        reset_url=target_url,
     )
 
     try:
@@ -60,10 +61,25 @@ async def run_test(
         await computer.close()
 
     # Log recording location if active
+    video_path = None
     if hasattr(computer, "video_path") and computer.video_path:
-        console.print(f"[bold cyan]Screen recording: {computer.video_path}[/]")
+        video_path = computer.video_path
+        console.print(f"[bold cyan]Screen recording: {video_path}[/]")
 
-    # Step 4: Determine exit code
+    # Step 4: Generate HTML report
+    if report_dir:
+        report_file = report_dir / f"{result.id}.html"
+        try:
+            generate_html_report(
+                checklist=result,
+                recording_path=str(video_path) if video_path else None,
+                output_path=report_file,
+            )
+            console.print(f"[bold green]HTML report: {report_file}[/]")
+        except Exception as e:
+            console.print(f"[yellow]Report generation failed: {e}[/]")
+
+    # Step 5: Determine exit code
     if result.failed > 0:
         return 1
     elif result.errored > 0:
@@ -85,6 +101,7 @@ def main():
     parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
     parser.add_argument("--checkpoint-dir", type=Path, help="Directory for checkpointing")
     parser.add_argument("--recording-dir", default="recordings", help="Directory for screen recording (default: recordings/)")
+    parser.add_argument("--report-dir", type=Path, default=None, help="Directory to write HTML report (optional)")
 
     args = parser.parse_args()
 
@@ -94,6 +111,7 @@ def main():
         headless=args.headless,
         checkpoint_dir=args.checkpoint_dir,
         recording_dir=args.recording_dir,
+        report_dir=args.report_dir,
     ))
     sys.exit(exit_code)
 
