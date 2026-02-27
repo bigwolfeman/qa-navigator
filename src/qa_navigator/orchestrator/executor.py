@@ -11,7 +11,7 @@ import re
 import time
 from typing import Optional
 
-_RETRY_DELAY_DEFAULT = 65  # seconds to wait on 429 before retry
+_RETRY_DELAYS = [300, 600, 900, 1800]  # seconds to wait on 429 before each retry attempt (5m/10m/15m/30m)
 
 from google import genai
 from google.adk.runners import InMemoryRunner
@@ -74,7 +74,7 @@ class TestExecutor:
         )
 
         result_text = ""
-        for attempt in range(2):  # one retry on 429
+        for attempt in range(len(_RETRY_DELAYS) + 1):  # up to 4 retries on 429
             try:
                 async for event in runner.run_async(
                     user_id="orchestrator",
@@ -114,12 +114,12 @@ class TestExecutor:
                 _tb_str = _tb.format_exc()
                 err_str = str(e)
 
-                # 429 Resource Exhausted — parse suggested wait time and retry once
+                # 429 Resource Exhausted — retry with increasing backoff
                 is_quota = "ResourceExhausted" in type(e).__name__ or "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
-                if is_quota and attempt == 0:
+                if is_quota and attempt < len(_RETRY_DELAYS):
                     wait_match = re.search(r"retry in (\d+(?:\.\d+)?)\s*s", err_str, re.IGNORECASE)
-                    wait_secs = float(wait_match.group(1)) + 5 if wait_match else _RETRY_DELAY_DEFAULT
-                    console.print(f"  [yellow]429 quota hit — waiting {wait_secs:.0f}s then retrying {item.id}...[/]")
+                    wait_secs = float(wait_match.group(1)) + 5 if wait_match else _RETRY_DELAYS[attempt]
+                    console.print(f"  [yellow]429 quota hit (attempt {attempt+1}/{len(_RETRY_DELAYS)+1}) — waiting {wait_secs:.0f}s then retrying {item.id}...[/]")
                     await asyncio.sleep(wait_secs)
                     # Re-create session for the retry
                     session = await runner.session_service.create_session(

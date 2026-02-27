@@ -138,7 +138,12 @@ INSTRUCTIONS: {instructions}
         # Parse the response
         checklist = self._parse_response(response.text, instructions, target_url, target_app)
 
-        console.print(f"[bold green]Generated {checklist.total} test items.[/]")
+        total_generated = checklist.total
+        if total_generated > settings.max_checklist_items:
+            checklist.items = checklist.items[:settings.max_checklist_items]
+            console.print(f"[bold green]Generated {total_generated} items — using first {settings.max_checklist_items}.[/]")
+        else:
+            console.print(f"[bold green]Generated {total_generated} test items.[/]")
         return checklist
 
     async def generate_from_discovery(
