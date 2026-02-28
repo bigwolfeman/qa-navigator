@@ -191,7 +191,7 @@ class QAPlaywrightComputer(BaseComputer):
         y: int,
         text: str,
         press_enter: bool = True,
-        clear_before_typing: bool = True,
+        clear_before_typing: bool = False,
     ) -> ComputerState:
         active_before = await self._page.evaluate("document.activeElement?.tagName + ':' + (document.activeElement?.className || '')")
         await self._page.mouse.click(x, y)
@@ -290,16 +290,17 @@ class QAPlaywrightComputer(BaseComputer):
         Called by the orchestrator between test items. Ensures each item
         starts from a clean-slate app state even if the previous item wrote
         to localStorage/sessionStorage (e.g. TodoMVC todo persistence).
+        Uses networkidle to ensure JS apps (React, Vue) fully initialize.
         """
         try:
             await self._page.goto(url)
-            await self._page.wait_for_load_state()
+            await self._page.wait_for_load_state("networkidle")
             # Clear browser storage so the app re-initialises with empty state
             await self._page.evaluate(
                 "() => { try { localStorage.clear(); sessionStorage.clear(); } catch(e) {} }"
             )
             await self._page.reload()
-            await self._page.wait_for_load_state()
+            await self._page.wait_for_load_state("networkidle")
         except Exception:
             pass
         return await self.current_state()
