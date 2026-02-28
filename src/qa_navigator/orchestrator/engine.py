@@ -102,9 +102,14 @@ class TestOrchestrator:
 
             self.progress.log_item_start(item)
 
-            # Reset page to known URL before each item so agents start from clean state
+            # Reset page to known URL before each item so agents start from clean state.
+            # Use reset_to_url() if available (clears localStorage/sessionStorage too)
+            # so apps like TodoMVC don't carry state from previous test items.
             if self.reset_url:
-                await self.computer.navigate(self.reset_url)
+                if hasattr(self.computer, "reset_to_url"):
+                    await self.computer.reset_to_url(self.reset_url)  # type: ignore[union-attr]
+                else:
+                    await self.computer.navigate(self.reset_url)
 
             # Capture before state
             before_state = await self.computer.current_state()

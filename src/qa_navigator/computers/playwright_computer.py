@@ -284,6 +284,26 @@ class QAPlaywrightComputer(BaseComputer):
             pass  # Invalid URL or navigation error — return current state
         return await self.current_state()
 
+    async def reset_to_url(self, url: str) -> ComputerState:
+        """Hard reset for per-item test isolation: clear all storage then reload.
+
+        Called by the orchestrator between test items. Ensures each item
+        starts from a clean-slate app state even if the previous item wrote
+        to localStorage/sessionStorage (e.g. TodoMVC todo persistence).
+        """
+        try:
+            await self._page.goto(url)
+            await self._page.wait_for_load_state()
+            # Clear browser storage so the app re-initialises with empty state
+            await self._page.evaluate(
+                "() => { try { localStorage.clear(); sessionStorage.clear(); } catch(e) {} }"
+            )
+            await self._page.reload()
+            await self._page.wait_for_load_state()
+        except Exception:
+            pass
+        return await self.current_state()
+
     async def key_combination(self, keys: list[str]) -> ComputerState:
         keys = [PLAYWRIGHT_KEY_MAP.get(k.lower(), k) for k in keys]
 
