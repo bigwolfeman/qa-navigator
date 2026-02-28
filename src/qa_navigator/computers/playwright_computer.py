@@ -197,6 +197,14 @@ class QAPlaywrightComputer(BaseComputer):
         await self._page.mouse.click(x, y)
         await self._page.wait_for_load_state()
         active_after = await self._page.evaluate("document.activeElement?.tagName + ':' + (document.activeElement?.className || '')")
+
+        # If click missed an input/textarea (landed on BODY/HTML), nudge 30px lower
+        # and retry — handles model coordinate predictions slightly above the element.
+        if active_after.startswith("BODY") or active_after.startswith("HTML"):
+            await self._page.mouse.click(x, y + 30)
+            await self._page.wait_for_load_state()
+            active_after = await self._page.evaluate("document.activeElement?.tagName + ':' + (document.activeElement?.className || '')")
+
         console.print(f"  [dim]type_text_at({x},{y},'{text[:30]}') active={active_before!r} -> {active_after!r}[/]")
 
         if clear_before_typing:
