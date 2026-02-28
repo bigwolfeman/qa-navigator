@@ -68,6 +68,7 @@ class QAPlaywrightComputer(BaseComputer):
         settle_time: float = 0.5,
         user_data_dir: Optional[str] = None,
         recording_dir: Optional[str] = None,
+        executable_path: Optional[str] = None,
     ):
         self._screen_size = screen_size
         self._initial_url = initial_url
@@ -76,6 +77,7 @@ class QAPlaywrightComputer(BaseComputer):
         self._settle_time = settle_time
         self._user_data_dir = user_data_dir
         self._recording_dir = recording_dir
+        self._executable_path = executable_path
 
         # Initialized in initialize()
         self._playwright = None
@@ -108,19 +110,19 @@ class QAPlaywrightComputer(BaseComputer):
             }
             console.print(f"[bold cyan]Recording to: {self._recording_dir}[/]")
 
+        launch_kwargs = {"args": browser_args, "headless": self._headless}
+        if self._executable_path:
+            launch_kwargs["executable_path"] = self._executable_path
+
         if self._user_data_dir:
             self._context = await self._playwright.chromium.launch_persistent_context(
                 self._user_data_dir,
-                headless=self._headless,
-                args=browser_args,
+                **launch_kwargs,
                 **context_kwargs,
             )
             self._browser = self._context.browser
         else:
-            self._browser = await self._playwright.chromium.launch(
-                args=browser_args,
-                headless=self._headless,
-            )
+            self._browser = await self._playwright.chromium.launch(**launch_kwargs)
             self._context = await self._browser.new_context(**context_kwargs)
 
         if not self._context.pages:

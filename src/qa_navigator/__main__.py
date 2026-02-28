@@ -66,6 +66,7 @@ async def run_test(
     app_exe: Optional[str] = None,
     app_title: Optional[str] = None,
     app_launch_wait: float = 3.0,
+    chromium_executable: Optional[str] = None,
 ) -> int:
     """Run a full QA test session.
 
@@ -108,6 +109,7 @@ async def run_test(
             initial_url=target_url,
             headless=headless,
             recording_dir=recording_dir,
+            executable_path=chromium_executable,
         )
         reset_url = target_url
 
@@ -180,6 +182,7 @@ def main():
         help="Testing instructions",
     )
     parser.add_argument("--headless", action="store_true", help="Run browser in headless mode (browser only)")
+    parser.add_argument("--chromium-executable", default=None, help="Path to Chromium/Chrome binary (overrides Playwright default)")
     parser.add_argument("--checkpoint-dir", type=Path, help="Directory for checkpointing")
     parser.add_argument("--recording-dir", default="recordings", help="Directory for screen recording (default: recordings/)")
     parser.add_argument("--report-dir", type=Path, default=None, help="Directory to write HTML report (optional)")
@@ -221,6 +224,7 @@ def main():
         app_exe=args.app_exe,
         app_title=args.app_title,
         app_launch_wait=args.app_launch_wait,
+        chromium_executable=args.chromium_executable,
     ))
     sys.exit(exit_code)
 
