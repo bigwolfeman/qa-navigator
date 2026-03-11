@@ -118,6 +118,7 @@ async def run_test(
         computer=computer,
         checkpoint_dir=checkpoint_dir,
         reset_url=reset_url,
+        native_desktop=(computer_type == "windows"),
     )
 
     try:
@@ -154,6 +155,29 @@ async def run_test(
     return 0
 
 
+async def _run_ci(args) -> int:
+    """Run in CI mode: replay scripts, explore uncovered UI, report."""
+    from .ci.runner import CIRunner
+
+    computer, app_proc = _build_computer(args)
+    script_dir = Path(args.script_dir)
+    native = getattr(args, "computer", "browser") == "windows"
+
+    try:
+        await computer.initialize()
+        runner = CIRunner(
+            computer=computer,
+            script_dir=script_dir,
+            app_name=args.url,
+            native_desktop=native,
+        )
+        return await runner.run()
+    finally:
+        await computer.close()
+        if app_proc and app_proc.poll() is None:
+            app_proc.terminate()
+
+
 def main():
     # Detect serve mode: first arg is "serve"
     if len(sys.argv) > 1 and sys.argv[1] == "serve":
@@ -187,6 +211,10 @@ def main():
     parser.add_argument("--recording-dir", default="recordings", help="Directory for screen recording (default: recordings/)")
     parser.add_argument("--report-dir", type=Path, default=None, help="Directory to write HTML report (optional)")
 
+    # CI mode
+    parser.add_argument("--ci", action="store_true", help="Run in CI mode: replay scripts → explore → report")
+    parser.add_argument("--script-dir", default="qa_scripts", help="Directory for saved test scripts (default: qa_scripts/)")
+
     # Computer selection
     parser.add_argument(
         "--computer",
@@ -213,19 +241,22 @@ def main():
 
     args = parser.parse_args()
 
-    exit_code = asyncio.run(run_test(
-        target_url=args.url,
-        instructions=args.instructions,
-        headless=args.headless,
-        checkpoint_dir=args.checkpoint_dir,
-        recording_dir=args.recording_dir,
-        report_dir=args.report_dir,
-        computer_type=args.computer,
-        app_exe=args.app_exe,
-        app_title=args.app_title,
-        app_launch_wait=args.app_launch_wait,
-        chromium_executable=args.chromium_executable,
-    ))
+    if args.ci:
+        exit_code = asyncio.run(_run_ci(args))
+    else:
+        exit_code = asyncio.run(run_test(
+            target_url=args.url,
+            instructions=args.instructions,
+            headless=args.headless,
+            checkpoint_dir=args.checkpoint_dir,
+            recording_dir=args.recording_dir,
+            report_dir=args.report_dir,
+            computer_type=args.computer,
+            app_exe=args.app_exe,
+            app_title=args.app_title,
+            app_launch_wait=args.app_launch_wait,
+            chromium_executable=args.chromium_executable,
+        ))
     sys.exit(exit_code)
 
 

@@ -67,9 +67,10 @@ class TestOrchestrator:
         computer: BaseComputer,
         checkpoint_dir: Optional[Path] = None,
         reset_url: Optional[str] = None,
+        native_desktop: bool = False,
     ):
         self.computer = computer
-        self.executor = TestExecutor(computer)
+        self.executor = TestExecutor(computer, native_desktop=native_desktop)
         self.progress = ProgressTracker(checkpoint_dir=checkpoint_dir)
         self.state = OrchestratorState.INITIALIZING
         self.checklist: Optional[Checklist] = None

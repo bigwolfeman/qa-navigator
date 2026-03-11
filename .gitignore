@@ -24,6 +24,18 @@ htmlcov/
 # Checkpoints
 checkpoints/
 
+# Recordings & reports
+recordings/
+reports/
+
 # OS
 .DS_Store
 CLAUDE.md
+PLAN.md
+docs/hackathon-submission.md
+
+# Artifacts
+*.log
+C:\\*
+uv.lock
+.claude/

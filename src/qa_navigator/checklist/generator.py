@@ -255,13 +255,20 @@ Use the standard ID format but start numbering after the existing items."""
             data = json.loads(text)
             raw_items = data.get("items", data) if isinstance(data, dict) else data
         except json.JSONDecodeError:
-            console.print("[bold red]Failed to parse checklist JSON, attempting recovery...[/]")
-            # Try to find JSON array in the text
+            console.print("[yellow]Failed to parse checklist JSON, attempting recovery...[/]")
             import re
+            # Try to find JSON array and parse as much as possible
             match = re.search(r'\[.*\]', text, re.DOTALL)
             if match:
-                raw_items = json.loads(match.group())
+                try:
+                    raw_items = json.loads(match.group())
+                except json.JSONDecodeError:
+                    # Truncated JSON — try to salvage complete objects
+                    raw_items = ChecklistGenerator._salvage_truncated_json(match.group())
             else:
+                # Try individual JSON objects
+                raw_items = ChecklistGenerator._salvage_truncated_json(text)
+            if not raw_items:
                 return []
 
         items = []
@@ -281,4 +288,30 @@ Use the standard ID format but start numbering after the existing items."""
             except Exception:
                 continue  # Skip malformed items
 
+        return items
+
+    @staticmethod
+    def _salvage_truncated_json(text: str) -> list[dict]:
+        """Extract as many complete JSON objects as possible from truncated text."""
+        import re
+        items = []
+        # Find all complete {...} objects (greedy match balanced braces)
+        depth = 0
+        start = None
+        for i, ch in enumerate(text):
+            if ch == '{':
+                if depth == 0:
+                    start = i
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0 and start is not None:
+                    try:
+                        obj = json.loads(text[start:i+1])
+                        if isinstance(obj, dict) and ("description" in obj or "action" in obj):
+                            items.append(obj)
+                    except json.JSONDecodeError:
+                        pass
+                    start = None
+        console.print(f"[yellow]Salvaged {len(items)} items from truncated JSON[/]")
         return items

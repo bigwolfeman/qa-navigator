@@ -352,19 +352,194 @@ class QAPlaywrightComputer(BaseComputer):
 
     async def get_accessibility_tree(self) -> dict:
         """Return Playwright accessibility snapshot for element discovery."""
-        return await self._page.accessibility.snapshot()
+        return await self.get_ui_tree()
 
     async def get_ui_tree(self) -> dict:
         """Return accessibility snapshot for the current page.
 
         Provides element names, roles, and positions so the agent can
         discover interactive elements without relying solely on screenshots.
+        Uses Playwright's ARIA snapshot (text format) and a JS-based DOM
+        walk for structured element data with coordinates.
         """
+        result: dict = {}
         try:
-            snapshot = await self._page.accessibility.snapshot()
-            return snapshot or {}
+            aria_text = await self._page.locator(":root").aria_snapshot()
+            result["aria_snapshot"] = aria_text
+        except Exception:
+            pass
+
+        try:
+            elements = await self._page.evaluate("""() => {
+                const interactive = ['a', 'button', 'input', 'select', 'textarea',
+                    '[role="button"]', '[role="link"]', '[role="checkbox"]',
+                    '[role="tab"]', '[role="menuitem"]', '[contenteditable]'];
+                const els = document.querySelectorAll(interactive.join(','));
+                return [...els].slice(0, 100).map(el => {
+                    const rect = el.getBoundingClientRect();
+                    return {
+                        tag: el.tagName.toLowerCase(),
+                        role: el.getAttribute('role') || '',
+                        name: el.getAttribute('aria-label') || el.innerText?.slice(0, 80) || '',
+                        type: el.getAttribute('type') || '',
+                        placeholder: el.getAttribute('placeholder') || '',
+                        enabled: !el.disabled,
+                        cx: Math.round(rect.x + rect.width / 2),
+                        cy: Math.round(rect.y + rect.height / 2),
+                    };
+                }).filter(e => e.cx > 0 && e.cy > 0);
+            }""")
+            result["elements"] = elements
         except Exception as e:
-            return {"error": str(e)}
+            result["elements_error"] = str(e)
+
+        return result
+
+    # --- Element-based interaction (accessibility-driven) ---
+
+    async def find_and_click(self, element_name: str) -> ComputerState:
+        """Find a UI element by name/text/role and click it.
+
+        Tries multiple Playwright locator strategies in order:
+        1. get_by_role with name match
+        2. get_by_text (exact then substring)
+        3. get_by_placeholder
+        4. get_by_label
+        5. CSS selector fallback
+
+        This bypasses coordinate-based clicking entirely, solving the
+        precision issues with Gemini's virtual coordinate mapping.
+        """
+        page = self._page
+        locator = None
+
+        # Strategy 1: role-based (buttons, links, checkboxes, etc.)
+        for role in ["button", "link", "checkbox", "tab", "menuitem", "textbox"]:
+            try:
+                loc = page.get_by_role(role, name=element_name)
+                if await loc.count() > 0:
+                    locator = loc.first
+                    break
+            except Exception:
+                continue
+
+        # Strategy 2: text match
+        if locator is None:
+            try:
+                loc = page.get_by_text(element_name, exact=True)
+                if await loc.count() > 0:
+                    locator = loc.first
+            except Exception:
+                pass
+
+        if locator is None:
+            try:
+                loc = page.get_by_text(element_name)
+                if await loc.count() > 0:
+                    locator = loc.first
+            except Exception:
+                pass
+
+        # Strategy 3: placeholder
+        if locator is None:
+            try:
+                loc = page.get_by_placeholder(element_name)
+                if await loc.count() > 0:
+                    locator = loc.first
+            except Exception:
+                pass
+
+        # Strategy 4: label
+        if locator is None:
+            try:
+                loc = page.get_by_label(element_name)
+                if await loc.count() > 0:
+                    locator = loc.first
+            except Exception:
+                pass
+
+        # Strategy 5: CSS selector (for class names, IDs, etc.)
+        if locator is None:
+            try:
+                loc = page.locator(element_name)
+                if await loc.count() > 0:
+                    locator = loc.first
+            except Exception:
+                pass
+
+        if locator is None:
+            console.print(f"  [red]find_and_click: '{element_name}' not found[/]")
+            return await self.current_state()
+
+        await locator.click(timeout=5000)
+        await asyncio.sleep(0.3)
+        return await self.current_state()
+
+    async def find_and_type(
+        self,
+        element_name: str,
+        text: str,
+        press_enter: bool = False,
+        clear_first: bool = False,
+    ) -> ComputerState:
+        """Find an input element by name/placeholder/label and type into it.
+
+        Uses Playwright locators for precise element targeting.
+        """
+        page = self._page
+        locator = None
+
+        # Strategy 1: placeholder match (most common for inputs)
+        try:
+            loc = page.get_by_placeholder(element_name)
+            if await loc.count() > 0:
+                locator = loc.first
+        except Exception:
+            pass
+
+        # Strategy 2: label match
+        if locator is None:
+            try:
+                loc = page.get_by_label(element_name)
+                if await loc.count() > 0:
+                    locator = loc.first
+            except Exception:
+                pass
+
+        # Strategy 3: role textbox with name
+        if locator is None:
+            try:
+                loc = page.get_by_role("textbox", name=element_name)
+                if await loc.count() > 0:
+                    locator = loc.first
+            except Exception:
+                pass
+
+        # Strategy 4: CSS selector
+        if locator is None:
+            try:
+                loc = page.locator(element_name)
+                if await loc.count() > 0:
+                    locator = loc.first
+            except Exception:
+                pass
+
+        if locator is None:
+            console.print(f"  [red]find_and_type: '{element_name}' not found[/]")
+            return await self.current_state()
+
+        if clear_first:
+            await locator.clear()
+        await locator.fill(text)
+        if press_enter:
+            await locator.press("Enter")
+        await asyncio.sleep(0.3)
+        return await self.current_state()
+
+    async def type_text(self, text: str) -> ComputerState:
+        """Type raw text at the current cursor position."""
+        await self._page.keyboard.type(text)
+        return await self.current_state()
 
     @property
     def video_path(self) -> Optional[Path]:
