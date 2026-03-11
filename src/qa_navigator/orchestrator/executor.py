@@ -409,7 +409,7 @@ class TestExecutor:
                         contents=contents,
                         config=gen_config,
                     ),
-                    timeout=120.0,
+                    timeout=180.0,
                 )
             except Exception as e:
                 err_str = str(e)
@@ -501,8 +501,8 @@ class TestExecutor:
             # Trim conversation history to prevent context growth from screenshots.
             # Keep: first user message (instruction) + last 6 turns (3 model + 3 user).
             # This prevents the 120s timeout from accumulating screenshot data.
-            if len(contents) > 8:
-                contents = [contents[0]] + contents[-6:]
+            if len(contents) > 6:
+                contents = [contents[0]] + contents[-4:]
 
         # Evaluate result
         final_state = await self.computer.current_state()
