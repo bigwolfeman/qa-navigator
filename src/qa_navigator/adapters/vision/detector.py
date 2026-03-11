@@ -3,7 +3,7 @@ UI Element Detector using YOLO-based object detection.
 
 Detects buttons, checkboxes, inputs, tabs, menus, and other UI elements.
 
-Ported from WindowsHarness.
+Windows desktop automation layer for QA Navigator.
 """
 
 import cv2

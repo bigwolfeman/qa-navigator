@@ -4,7 +4,7 @@ Mouse Operations Controller
 Provides comprehensive mouse automation using SendInput for maximum compatibility.
 Supports DPI-aware coordinates, rate limiting, and precise movement control.
 
-Ported from WindowsHarness.
+Windows desktop automation layer for QA Navigator.
 """
 
 import ctypes

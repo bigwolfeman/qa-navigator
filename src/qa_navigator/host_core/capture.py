@@ -1,4 +1,4 @@
-"""Windows screenshot capture via BitBlt/DWM. Ported from WindowsHarness."""
+"""Windows screenshot capture via BitBlt/DWM. Windows desktop automation layer for QA Navigator."""
 
 import ctypes
 import ctypes.wintypes

@@ -4,7 +4,7 @@ Focus control and window activation functionality.
 This module provides robust window activation with multiple fallback strategies
 to achieve a 95% success rate for bringing windows to the foreground.
 
-Ported from WindowsHarness.
+Windows desktop automation layer for QA Navigator.
 """
 
 import time

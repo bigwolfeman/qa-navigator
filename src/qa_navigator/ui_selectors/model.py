@@ -4,7 +4,7 @@ Normalized selector schema for cross-framework element selection.
 Supports UIA, Win32, and CDP selectors in a unified model that allows
 adapters to choose the most appropriate method for element identification.
 
-Ported from WindowsHarness.
+Windows desktop automation layer for QA Navigator.
 """
 
 from dataclasses import dataclass, field

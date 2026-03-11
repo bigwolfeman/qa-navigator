@@ -5,7 +5,7 @@ Provides automation control for modern Windows applications using the
 UI Automation framework. Supports WPF, WinUI, UWP, and other applications
 that expose UIA providers.
 
-Ported from WindowsHarness.
+Windows desktop automation layer for QA Navigator.
 """
 
 import logging

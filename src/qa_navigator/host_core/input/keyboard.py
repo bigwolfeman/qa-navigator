@@ -4,7 +4,7 @@ Keyboard Operations Controller
 Provides comprehensive keyboard automation using SendInput with proper scan codes.
 Supports IME-safe text input, international layouts, and modifier key combinations.
 
-Ported from WindowsHarness.
+Windows desktop automation layer for QA Navigator.
 """
 
 import ctypes

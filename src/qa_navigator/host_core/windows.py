@@ -4,7 +4,7 @@ Windows enumeration and window management functionality.
 This module provides comprehensive window enumeration, process mapping,
 multi-monitor support, and coordinate normalization for the Harness system.
 
-Ported from WindowsHarness.
+Windows desktop automation layer for QA Navigator.
 """
 
 import ctypes

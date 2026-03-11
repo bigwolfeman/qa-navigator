@@ -1,13 +1,13 @@
 """Windows desktop BaseComputer implementation.
 
-Wraps the WindowsHarness host_core modules (capture, mouse, keyboard,
+Wraps host_core modules (capture, mouse, keyboard,
 window management) into Google ADK's BaseComputer interface. This enables
 Gemini computer-use agents to control the full Windows desktop - not just
 browsers, but any application.
 
 Only importable on Windows (requires Win32 APIs).
 
-Ported from WindowsHarness host_core modules.
+Windows desktop automation backend for QA Navigator.
 """
 
 import asyncio

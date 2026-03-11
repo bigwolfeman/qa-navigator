@@ -3,7 +3,7 @@ Spatial Memory System for UI Element Tracking.
 
 Provides element fingerprinting, spatial relationships, and persistence across UI changes.
 
-Ported from WindowsHarness.
+Windows desktop automation layer for QA Navigator.
 """
 
 import hashlib

@@ -1,1 +1,1 @@
-"""Windows automation adapters (UIA, Win32, Vision). Ported from WindowsHarness."""
+"""Windows automation adapters: UIA, Win32, and Vision-based element detection."""

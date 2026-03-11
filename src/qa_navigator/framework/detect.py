@@ -4,7 +4,7 @@ Framework detection for UI automation.
 Analyzes process modules to determine the most appropriate automation
 method (UIA, Win32, CDP) based on loaded libraries and frameworks.
 
-Ported from WindowsHarness.
+Windows desktop automation layer for QA Navigator.
 """
 
 import os

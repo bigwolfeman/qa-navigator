@@ -4,7 +4,7 @@ Base adapter contract for UI automation frameworks.
 Defines the minimal interface that all adapters must implement to provide
 consistent automation capabilities across different UI technologies.
 
-Ported from WindowsHarness.
+Windows desktop automation layer for QA Navigator.
 """
 
 from abc import ABC, abstractmethod

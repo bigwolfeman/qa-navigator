@@ -5,7 +5,7 @@ Provides automation control for traditional Windows applications using
 Win32 APIs and control messages. Does not hijack user input - uses
 direct control messages instead.
 
-Ported from WindowsHarness.
+Windows desktop automation layer for QA Navigator.
 """
 
 import logging

@@ -5,7 +5,7 @@ Maintains a registry of available adapters and selects the most
 appropriate one based on process framework detection and adapter
 confidence scoring.
 
-Ported from WindowsHarness.
+Windows desktop automation layer for QA Navigator.
 """
 
 from typing import List, Optional, Dict, Any

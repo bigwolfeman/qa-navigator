@@ -5,7 +5,7 @@ Provides reliable keyboard, mouse, clipboard, and hotkey operations with safety
 mechanisms. Exposes module-level convenience functions backed by global singleton
 instances of MouseOperations, KeyboardOperations, and ClipboardManager.
 
-Ported from WindowsHarness.
+Windows desktop automation layer for QA Navigator.
 """
 
 import ctypes

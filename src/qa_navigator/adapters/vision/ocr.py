@@ -3,7 +3,7 @@ OCR Engine with Windows OCR API and Tesseract fallback.
 
 Supports multiple languages, DPI scaling, and performance optimization.
 
-Ported from WindowsHarness.
+Windows desktop automation layer for QA Navigator.
 """
 
 import asyncio
