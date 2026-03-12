@@ -10,6 +10,26 @@ Works on browsers (Playwright) and native Windows desktop apps (Win32/UIA).
 
 ---
 
+## Quick Setup
+
+Add AI-powered UI testing to your repo's CI/CD in 30 seconds:
+
+```bash
+curl -sL https://raw.githubusercontent.com/bigwolfeman/qa-navigator/master/setup.sh | bash
+```
+
+Or clone and run locally:
+
+```bash
+git clone https://github.com/bigwolfeman/qa-navigator.git
+cd qa-navigator
+./setup.sh
+```
+
+The wizard detects your repo, asks what to test, and generates the right CI config (GitHub Actions, GitLab CI, or Cloud Run).
+
+---
+
 ## Two Modes
 
 ### Mode 1 — One-shot Test Run
@@ -69,7 +89,7 @@ CI mode runs three phases:
 
 When a PR removes or renames a UI element, scripts that reference it fail and get regenerated automatically. New elements get new scripts. The script library is version-controlled alongside the app — reviewable in PR diffs the same way as unit tests.
 
-A GitHub Actions workflow is included at `.github/workflows/qa-test.yml`. It triggers on PRs against main, runs CI mode, commits any new scripts, and uploads the HTML report as a build artifact.
+Run `./setup.sh` to generate a workflow for your repo, or use the included example at `.github/workflows/qa-test.yml`.
 
 See [qa_scripts/PLAYBOOK.md](qa_scripts/PLAYBOOK.md) for the full CI playbook.
 
