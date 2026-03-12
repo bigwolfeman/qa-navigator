@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Quick deploy to Cloud Run. For interactive setup, use: ./setup.sh
 set -euo pipefail
 
 PROJECT_ID="${GCP_PROJECT_ID:?Set GCP_PROJECT_ID}"
