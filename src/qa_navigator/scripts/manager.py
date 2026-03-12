@@ -20,6 +20,7 @@ Each script is async Python using the `computer` harness object in scope:
 
 import re
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -64,6 +65,9 @@ class ScriptManager:
         slug = _slug(capability)
         path = self.app_dir / f"{slug}.py"
 
+        if path.exists():
+            shutil.copy2(path, self.app_dir / f"{slug}.bak.py")
+
         lines = [script_header(self.app_name, capability, description)]
         for call in tool_calls:
             tool = call["tool"]
@@ -81,6 +85,19 @@ class ScriptManager:
                 lines.append(f"await computer.key_combination({keys!r})")
             elif tool == "get_ui_tree":
                 lines.append("await computer.get_ui_tree()  # discovery step")
+            elif tool == "click_at":
+                x, y = args.get("x", 0), args.get("y", 0)
+                lines.append(f"await computer.click_at({x}, {y})")
+            elif tool == "double_click_at":
+                x, y = args.get("x", 0), args.get("y", 0)
+                lines.append(f"await computer.double_click_at({x}, {y})")
+            elif tool == "type_text":
+                text = repr(args.get("text", ""))
+                lines.append(f"await computer.type_text({text})")
+            elif tool == "get_page_info":
+                lines.append("await computer.get_page_info()  # verify state")
+            elif tool == "screenshot":
+                lines.append("await computer.current_state()  # screenshot")
             # add sleep after actions for UI settle
             lines.append("await _asyncio.sleep(0.4)")
 

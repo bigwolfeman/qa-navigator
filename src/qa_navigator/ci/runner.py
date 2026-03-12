@@ -42,6 +42,14 @@ class CoverageMap:
                 self.covered_elements.add(match.group(1))
             for match in re.finditer(r"find_and_type\(['\"]([^'\"]+)['\"]", code):
                 self.covered_elements.add(match.group(1))
+            # click_at(x, y) / double_click_at(x, y) — track as coord markers
+            for match in re.finditer(r"(?:double_click_at|click_at)\((\d+),\s*(\d+)\)", code):
+                self.covered_elements.add(f"coord_{match.group(1)}_{match.group(2)}")
+            # key_combination(["ctrl", "s"]) or key_combination(keys=["ctrl", "s"])
+            for match in re.finditer(r"key_combination\([^\)]*\[([^\]]+)\]", code):
+                keys = re.findall(r"['\"]([^'\"]+)['\"]", match.group(1))
+                if keys:
+                    self.covered_elements.add("key_" + "+".join(keys))
 
     def find_uncovered(self, ui_tree: dict) -> list[dict]:
         """Compare live UI tree against covered elements.
@@ -54,10 +62,15 @@ class CoverageMap:
 
     def _walk(self, nodes: list, uncovered: list) -> None:
         _INTERACTIVE = {
+            # Windows UIA control types
             "ButtonControl", "MenuItemControl", "MenuBarItemControl",
             "CheckBoxControl", "RadioButtonControl", "EditControl",
             "ComboBoxControl", "ListItemControl", "TabItemControl",
             "TreeItemControl", "HyperlinkControl",
+            # Playwright accessibility roles (browser mode)
+            "button", "link", "textbox", "checkbox", "radio",
+            "combobox", "listitem", "tab", "menuitem", "treeitem",
+            "menuitemcheckbox", "menuitemradio", "option",
         }
         for node in nodes:
             name = node.get("name", "")
