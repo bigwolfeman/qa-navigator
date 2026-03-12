@@ -1,0 +1,114 @@
+name: QA Navigator CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "URL to test"
+        required: true
+        default: "https://todomvc.com/examples/react/dist/"
+      instructions:
+        description: "Testing instructions"
+        required: false
+        default: "Test all interactive features"
+
+env:
+  GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+
+jobs:
+  qa-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[server]"
+          playwright install chromium
+
+      - name: Run QA Navigator (CI mode)
+        run: |
+          python -m qa_navigator \
+            --url "${{ github.event.inputs.target_url || 'https://todomvc.com/examples/react/dist/' }}" \
+            --instructions "${{ github.event.inputs.instructions || 'Test all interactive features of this application' }}" \
+            --ci \
+            --script-dir qa_scripts \
+            --headless \
+            --report-dir reports/
+        env:
+          QA_NAV_HEADLESS: "true"
+          QA_NAV_SCREEN_WIDTH: "1280"
+          QA_NAV_SCREEN_HEIGHT: "900"
+          QA_NAV_INTER_ITEM_DELAY_SECONDS: "5"
+
+      - name: Commit new/updated scripts
+        if: always()
+        run: |
+          git config user.name "QA Navigator Bot"
+          git config user.email "qa-navigator@github-actions"
+          git add qa_scripts/
+          if git diff --staged --quiet; then
+            echo "No new scripts to commit"
+          else
+            git commit -m "qa-navigator: update test scripts [skip ci]"
+            git push
+          fi
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-report
+          path: reports/
+          retention-days: 30
+
+  # Windows native desktop tests (runs on self-hosted Windows runner or GCE)
+  qa-test-windows:
+    if: false  # Enable when Windows runner is configured
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[windows]"
+
+      - name: Run QA Navigator (Windows CI)
+        run: |
+          python -m qa_navigator `
+            --url "Notepad" `
+            --computer windows `
+            --app-exe notepad.exe `
+            --app-title "Notepad" `
+            --ci `
+            --script-dir qa_scripts `
+            --report-dir reports/
+        env:
+          QA_NAV_SCREEN_WIDTH: "1280"
+          QA_NAV_SCREEN_HEIGHT: "900"
+
+      - name: Commit new scripts
+        if: always()
+        run: |
+          git config user.name "QA Navigator Bot"
+          git config user.email "qa-navigator@github-actions"
+          git add qa_scripts/
+          $changes = git diff --staged --quiet; if ($LASTEXITCODE -ne 0) { git commit -m "qa-navigator: update Windows test scripts [skip ci]"; git push }

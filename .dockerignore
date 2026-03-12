@@ -1,0 +1,14 @@
+.git
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.env
+recordings/
+reports/
+Ai-notes/
+*.mp4
+*.webm
+*.log
+cloudshell*.png
+uv.lock
