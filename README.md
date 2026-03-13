@@ -6,6 +6,8 @@ The problem with giving an LLM a test plan is that it'll check three things, say
 
 Works on browsers (Playwright) and native Windows desktop apps (Win32/UIA).
 
+https://youtu.be/ryKm-AVvag8
+
 ![Architecture](docs/architecture.png)
 
 ---
