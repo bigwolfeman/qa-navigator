@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from ..accessibility.auditor import WCAGReport, Severity
 from ..checklist.models import Checklist, ChecklistItem, ItemStatus
 
 
@@ -54,6 +55,37 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .video-section h2 { font-size: 1.2rem; margin-bottom: 1rem; color: #444; }
 .video-section video { width: 100%; max-width: 900px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
 .footer { text-align: center; padding: 2rem; color: #888; font-size: 0.85rem; }
+.wcag-section { padding: 0 1.5rem 2rem; }
+.wcag-section h2 { font-size: 1.2rem; margin-bottom: 1rem; color: #444; }
+.wcag-score { display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.5rem; }
+.wcag-score .score-circle { width: 90px; height: 90px; border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 1.8rem; font-weight: 700; color: white; flex-shrink: 0; }
+.score-high { background: linear-gradient(135deg, #1e8e3e, #34a853); }
+.score-mid { background: linear-gradient(135deg, #f29900, #fbbc04); }
+.score-low { background: linear-gradient(135deg, #d93025, #ea4335); }
+.wcag-stats { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+.wcag-stat { background: white; border-radius: 6px; padding: 0.5rem 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    font-size: 0.85rem; }
+.wcag-stat .count { font-weight: 700; margin-right: 0.3rem; }
+.wcag-stat.critical .count { color: #d93025; }
+.wcag-stat.serious .count { color: #e37400; }
+.wcag-stat.moderate .count { color: #f29900; }
+.wcag-stat.minor .count { color: #5f6368; }
+.wcag-stat.passed .count { color: #1e8e3e; }
+.violation { background: white; border-radius: 8px; margin-bottom: 0.6rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    padding: 0.8rem 1.2rem; display: flex; gap: 0.8rem; align-items: flex-start; }
+.violation .sev { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; padding: 0.15rem 0.5rem;
+    border-radius: 3px; white-space: nowrap; flex-shrink: 0; margin-top: 0.1rem; }
+.sev.critical { background: #fce8e6; color: #d93025; }
+.sev.serious { background: #fef3e2; color: #e37400; }
+.sev.moderate { background: #fff8e1; color: #f29900; }
+.sev.minor { background: #f5f5f5; color: #5f6368; }
+.violation .v-body { flex: 1; }
+.violation .v-desc { font-size: 0.9rem; }
+.violation .v-meta { font-size: 0.75rem; color: #888; margin-top: 0.2rem; }
+.violation .v-selector { font-family: monospace; font-size: 0.75rem; color: #666; background: #f9f9f9;
+    padding: 0.2rem 0.4rem; border-radius: 3px; margin-top: 0.3rem; display: inline-block; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 """
 
 _TOGGLE_JS = """
@@ -139,10 +171,76 @@ def _escape(text: str) -> str:
             .replace('"', "&quot;"))
 
 
+def _wcag_section_html(wcag: WCAGReport) -> str:
+    """Build the WCAG accessibility audit section."""
+    score = wcag.score
+    if score >= 80:
+        score_cls = "score-high"
+    elif score >= 50:
+        score_cls = "score-mid"
+    else:
+        score_cls = "score-low"
+
+    critical = wcag.critical_count
+    serious = wcag.serious_count
+    moderate = sum(1 for v in wcag.violations if v.severity == Severity.MODERATE)
+    minor = sum(1 for v in wcag.violations if v.severity == Severity.MINOR)
+    passed = len(wcag.passes)
+
+    stats = f"""<div class="wcag-stats">
+  <div class="wcag-stat critical"><span class="count">{critical}</span>Critical</div>
+  <div class="wcag-stat serious"><span class="count">{serious}</span>Serious</div>
+  <div class="wcag-stat moderate"><span class="count">{moderate}</span>Moderate</div>
+  <div class="wcag-stat minor"><span class="count">{minor}</span>Minor</div>
+  <div class="wcag-stat passed"><span class="count">{passed}</span>Passed</div>
+</div>"""
+
+    # Sort violations: critical first, then serious, moderate, minor
+    severity_order = {Severity.CRITICAL: 0, Severity.SERIOUS: 1, Severity.MODERATE: 2, Severity.MINOR: 3}
+    sorted_violations = sorted(wcag.violations, key=lambda v: severity_order[v.severity])
+
+    violations_html = ""
+    for v in sorted_violations:
+        sev_cls = v.severity.value
+        selector = f'<div class="v-selector">{_escape(v.selector[:100])}</div>' if v.selector else ""
+        violations_html += f"""
+<div class="violation">
+  <span class="sev {sev_cls}">{v.severity.value}</span>
+  <div class="v-body">
+    <div class="v-desc">{_escape(v.description)}</div>
+    <div class="v-meta">WCAG {v.wcag_criteria} Level {v.level.value} &middot; {v.rule_id}</div>
+    {selector}
+  </div>
+</div>"""
+
+    page_info = ""
+    if wcag.page_stats:
+        ps = wcag.page_stats
+        page_info = f"""<div style="font-size:0.85rem;color:#666;margin-bottom:1rem;">
+  {ps.get('total_elements', 0)} elements &middot;
+  {ps.get('interactive_elements', 0)} interactive &middot;
+  {ps.get('images', 0)} images &middot;
+  {ps.get('headings', 0)} headings &middot;
+  {ps.get('forms', 0)} forms
+</div>"""
+
+    return f"""
+<div class="wcag-section">
+  <h2>WCAG 2.1 Accessibility Audit</h2>
+  <div class="wcag-score">
+    <div class="score-circle {score_cls}">{score:.0f}</div>
+    {stats}
+  </div>
+  {page_info}
+  {violations_html if violations_html else '<div class="observation pass">No accessibility violations detected.</div>'}
+</div>"""
+
+
 def generate_html_report(
     checklist: Checklist,
     recording_path: Optional[str] = None,
     output_path: Optional[Path] = None,
+    wcag_report: Optional[WCAGReport] = None,
 ) -> str:
     """Generate a self-contained HTML report from a completed test run.
 
@@ -202,6 +300,9 @@ def generate_html_report(
   </video>
 </div>"""
 
+    # WCAG section
+    wcag_html = _wcag_section_html(wcag_report) if wcag_report else ""
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -220,6 +321,7 @@ def generate_html_report(
     </div>
   </div>
   {summary}
+  {wcag_html}
   {video_section}
   <div class="items">
     <h2>Test Items ({total})</h2>

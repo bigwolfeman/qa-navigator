@@ -10,6 +10,7 @@ from typing import Optional
 
 from rich.console import Console
 
+from .accessibility.auditor import WCAGAuditor
 from .checklist.generator import ChecklistGenerator
 from .computers.playwright_computer import QAPlaywrightComputer
 from .config import settings
@@ -67,6 +68,7 @@ async def run_test(
     app_title: Optional[str] = None,
     app_launch_wait: float = 3.0,
     chromium_executable: Optional[str] = None,
+    run_wcag: bool = False,
 ) -> int:
     """Run a full QA test session.
 
@@ -121,8 +123,29 @@ async def run_test(
         native_desktop=(computer_type == "windows"),
     )
 
+    wcag_report = None
     try:
         result = await orchestrator.run(checklist)
+
+        # Step 3b: WCAG accessibility audit (while browser is still open)
+        if run_wcag and computer_type == "browser" and hasattr(computer, 'page'):
+            console.print("\n[bold cyan]Running WCAG 2.1 accessibility audit...[/]")
+            try:
+                # Navigate back to target for a clean audit
+                await computer.page.goto(target_url, wait_until="networkidle", timeout=30000)
+                auditor = WCAGAuditor()
+                wcag_report = await auditor.audit(computer.page)
+                console.print(
+                    f"[bold]Accessibility score: {wcag_report.score:.0f}/100 "
+                    f"({wcag_report.total_violations} violations, "
+                    f"{len(wcag_report.passes)} checks passed)[/]"
+                )
+                if wcag_report.critical_count:
+                    console.print(f"  [red]{wcag_report.critical_count} critical issues[/]")
+                if wcag_report.serious_count:
+                    console.print(f"  [yellow]{wcag_report.serious_count} serious issues[/]")
+            except Exception as e:
+                console.print(f"[yellow]WCAG audit failed: {e}[/]")
     finally:
         await computer.close()
         if app_proc and app_proc.poll() is None:
@@ -142,6 +165,7 @@ async def run_test(
                 checklist=result,
                 recording_path=str(video_path) if video_path else None,
                 output_path=report_file,
+                wcag_report=wcag_report,
             )
             console.print(f"[bold green]HTML report: {report_file}[/]")
         except Exception as e:
@@ -153,6 +177,55 @@ async def run_test(
     elif result.errored > 0:
         return 2
     return 0
+
+
+async def _run_wcag_only(args) -> int:
+    """Run standalone WCAG 2.1 accessibility audit (no test suite)."""
+    from .accessibility.auditor import WCAGAuditor, WCAGReport
+    from .checklist.models import Checklist
+
+    computer = QAPlaywrightComputer(
+        screen_size=settings.screen_size,
+        initial_url=args.url,
+        headless=args.headless,
+    )
+    await computer.initialize()
+
+    try:
+        console.print(f"\n[bold cyan]WCAG 2.1 Accessibility Audit: {args.url}[/]\n")
+        auditor = WCAGAuditor()
+        wcag_report = await auditor.audit(computer.page)
+
+        # Print results
+        console.print(f"[bold]Score: {wcag_report.score:.0f}/100[/]")
+        console.print(f"  Violations: {wcag_report.total_violations}")
+        console.print(f"  Checks passed: {len(wcag_report.passes)}")
+
+        if wcag_report.critical_count:
+            console.print(f"\n  [red bold]{wcag_report.critical_count} CRITICAL[/]")
+        if wcag_report.serious_count:
+            console.print(f"  [yellow bold]{wcag_report.serious_count} SERIOUS[/]")
+
+        for v in sorted(wcag_report.violations,
+                       key=lambda x: {"critical": 0, "serious": 1, "moderate": 2, "minor": 3}[x.severity.value]):
+            sev_color = {"critical": "red", "serious": "yellow", "moderate": "yellow", "minor": "dim"}.get(v.severity.value, "")
+            console.print(f"  [{sev_color}]{v.severity.value.upper():8s}[/] WCAG {v.wcag_criteria} — {v.description}")
+
+        # Generate report if requested
+        if args.report_dir:
+            report_dir = Path(args.report_dir)
+            report_file = report_dir / "wcag_audit.html"
+            empty_checklist = Checklist(id="wcag-audit", target_url=args.url)
+            generate_html_report(
+                checklist=empty_checklist,
+                output_path=report_file,
+                wcag_report=wcag_report,
+            )
+            console.print(f"\n[bold green]Report: {report_file}[/]")
+
+        return 0 if wcag_report.critical_count == 0 else 1
+    finally:
+        await computer.close()
 
 
 async def _run_ci(args) -> int:
@@ -215,6 +288,9 @@ def main():
     parser.add_argument("--ci", action="store_true", help="Run in CI mode: replay scripts → explore → report")
     parser.add_argument("--script-dir", default="qa_scripts", help="Directory for saved test scripts (default: qa_scripts/)")
 
+    # Accessibility
+    parser.add_argument("--wcag", action="store_true", help="Run WCAG 2.1 accessibility audit and include in report")
+
     # Computer selection
     parser.add_argument(
         "--computer",
@@ -241,7 +317,10 @@ def main():
 
     args = parser.parse_args()
 
-    if args.ci:
+    if args.wcag and not args.ci and args.instructions == parser.get_default("instructions"):
+        # Standalone WCAG audit — no test suite, just accessibility check
+        exit_code = asyncio.run(_run_wcag_only(args))
+    elif args.ci:
         exit_code = asyncio.run(_run_ci(args))
     else:
         exit_code = asyncio.run(run_test(
@@ -256,6 +335,7 @@ def main():
             app_title=args.app_title,
             app_launch_wait=args.app_launch_wait,
             chromium_executable=args.chromium_executable,
+            run_wcag=args.wcag,
         ))
     sys.exit(exit_code)
 

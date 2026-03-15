@@ -104,6 +104,25 @@ The library itself can be given to any agent for automation over most applicatio
 Point any coding agent to this repo and explain to them how you want it to be used for your usecase.
 
 ---
+
+### Mode 4 — WCAG Accessibility Audit
+
+Point it at any URL and get a WCAG 2.1 compliance report — no test suite needed.
+
+```bash
+# Standalone audit
+python -m qa_navigator --url https://your-app.com --wcag --headless
+
+# With HTML report
+python -m qa_navigator --url https://your-app.com --wcag --headless --report-dir reports/
+
+# Combined: full QA test + accessibility audit
+python -m qa_navigator --url https://your-app.com --wcag --report-dir reports/
+```
+
+Checks 15 WCAG 2.1 Level A/AA criteria via DOM inspection: missing alt text, unlabeled forms, color contrast ratios, heading structure, ARIA validity, focus indicators, skip navigation, duplicate IDs, viewport scaling, and more. Returns exit code 1 if critical violations are found.
+
+---
 ## Deploy to Cloud Run (Server Mode)
 
 ```bash
@@ -154,6 +173,7 @@ qa_navigator/
 ├── computers/             # Playwright (browser) + Windows (native) backends
 ├── scripts/               # Saved automation script library
 ├── server/                # FastAPI async job server
+├── accessibility/         # WCAG 2.1 auditor (DOM-based, 15 checks)
 ├── report/                # HTML report generator
 ├── host_core/             # Windows input/capture/focus (Win32 APIs)
 ├── adapters/              # UIA + Win32 + Vision element detection
