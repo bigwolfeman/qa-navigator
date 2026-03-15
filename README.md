@@ -97,6 +97,13 @@ See [qa_scripts/PLAYBOOK.md](qa_scripts/PLAYBOOK.md) for the full CI playbook.
 
 ---
 
+### Mode 3 — Standalone Library
+
+The library itself can be given to any agent for automation over most applications in Windows.
+
+Point any coding agent to this repo and explain to them how you want it to be used for your usecase.
+
+---
 ## Deploy to Cloud Run (Server Mode)
 
 ```bash
